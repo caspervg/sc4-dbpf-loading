@@ -19,6 +19,7 @@
  */
 
 #include "GZStringConvert.h"
+#include <stdexcept>
 #include <Windows.h>
 
 namespace
@@ -85,11 +86,6 @@ cRZBaseString GZStringConvert::FromUtf16(const std::wstring& str)
 	return result;
 }
 
-cRZBaseString GZStringConvert::FromFileSystemPath(const std::filesystem::path& path)
-{
-	return FromUtf16(path.native());
-}
-
 std::wstring GZStringConvert::ToUtf16(const cIGZString& str)
 {
 	std::wstring result;
@@ -131,12 +127,4 @@ std::wstring GZStringConvert::ToUtf16(const cIGZString& str)
 	}
 
 	return result;
-}
-
-std::filesystem::path GZStringConvert::ToFileSystemPath(const cIGZString& str)
-{
-	std::wstring utf16Str = ToUtf16(str);
-	std::filesystem::path path(std::move(utf16Str));
-
-	return path;
 }
