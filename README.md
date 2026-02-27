@@ -47,12 +47,12 @@ It supports to following options (only 1 can be used at a time):
 
 # License
 
-This project is licensed under the terms of the MIT License.    
+This project is licensed under the terms of the GNU Lesser General Public License version 3.0.    
 See [LICENSE.txt](LICENSE.txt) for more information.
 
 ## 3rd party code
 
-[gzcom-dll](https://github.com/nsgomez/gzcom-dll/tree/master) - MIT License.    
+[gzcom-dll](https://github.com/nsgomez/gzcom-dll/tree/master) - LGPL 2.1 or later License.    
 [SC4Fix](https://github.com/nsgomez/sc4fix) - MIT License.     
 [.NET runtime](https://github.com/dotnet/runtime) The `Stopwatch` class is based on `System.Diagnostics.Stopwatch`, MIT License.    
 [Detours](https://github.com/microsoft/Detours) - MIT License    
