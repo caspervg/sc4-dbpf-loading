@@ -19,29 +19,10 @@
  */
 
 #include "PathUtil.h"
-#include <stdexcept>
 #include <Windows.h>
-#include "boost/algorithm/string.hpp"
 
-namespace
-{
-	const std::wstring_view extendedPathPrefix = L"\\\\?\\";
-	const std::wstring_view extendedUncPathPrefix = L"\\\\?\\UNC\\";
-
-	void ThrowExceptionForWin32Error(const char* win32MethodName, DWORD error)
-	{
-		char buffer[1024]{};
-
-		std::snprintf(
-			buffer,
-			sizeof(buffer),
-			"%s failed with error code %u.",
-			win32MethodName,
-			error);
-
-		throw std::runtime_error(buffer);
-	}
-}
+static const std::wstring_view extendedPathPrefix = L"\\\\?\\";
+static const std::wstring_view extendedUncPathPrefix = L"\\\\?\\UNC\\";
 
 std::wstring PathUtil::AddExtendedPathPrefix(const std::wstring& path)
 {
@@ -141,10 +122,7 @@ std::wstring PathUtil::Normalize(const std::wstring& path)
 
 	DWORD normalizedPathLengthWithNull = GetFullPathNameW(path.c_str(), 0, nullptr, nullptr);
 
-	if (normalizedPathLengthWithNull == 0)
-	{
-		ThrowExceptionForWin32Error("GetFullPathNameW", GetLastError());
-	}
+	THROW_LAST_ERROR_IF(normalizedPathLengthWithNull == 0);
 
 	std::wstring normalizedPath;
 	normalizedPath.resize(normalizedPathLengthWithNull);
@@ -155,10 +133,7 @@ std::wstring PathUtil::Normalize(const std::wstring& path)
 		normalizedPath.data(),
 		nullptr);
 
-	if (normalizedPathLength2 == 0)
-	{
-		ThrowExceptionForWin32Error("GetFullPathNameW", GetLastError());
-	}
+	THROW_LAST_ERROR_IF(normalizedPathLength2 == 0);
 
 	// Strip the null terminator.
 	normalizedPath.resize(normalizedPathLength2);

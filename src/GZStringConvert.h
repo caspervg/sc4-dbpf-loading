@@ -20,6 +20,7 @@
 
 #pragma once
 #include "cRZBaseString.h"
+#include "wil/result.h"
 
 // Provides utility functions for cIGZString character set conversion.
 // The native cIGZString character set is UTF-8.

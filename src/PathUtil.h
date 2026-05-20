@@ -20,6 +20,7 @@
 
 #pragma once
 #include <string>
+#include "wil/result.h"
 
 namespace PathUtil
 {

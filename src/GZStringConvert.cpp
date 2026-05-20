@@ -22,23 +22,6 @@
 #include <stdexcept>
 #include <Windows.h>
 
-namespace
-{
-	void ThrowExceptionForWin32Error(const char* win32MethodName, DWORD error)
-	{
-		char buffer[1024]{};
-
-		std::snprintf(
-			buffer,
-			sizeof(buffer),
-			"%s failed with error code %u.",
-			win32MethodName,
-			error);
-
-		throw std::runtime_error(buffer);
-	}
-}
-
 cRZBaseString GZStringConvert::FromUtf16(const std::wstring& str)
 {
 	cRZBaseString result;
@@ -58,11 +41,7 @@ cRZBaseString GZStringConvert::FromUtf16(const std::wstring& str)
 			nullptr,
 			nullptr);
 
-		if (utf8Length == 0)
-		{
-			DWORD lastError = GetLastError();
-			ThrowExceptionForWin32Error("WideCharToMultiByte", lastError);
-		}
+		THROW_LAST_ERROR_IF(utf8Length == 0);
 
 		result.Resize(static_cast<uint32_t>(utf8Length));
 
@@ -76,11 +55,7 @@ cRZBaseString GZStringConvert::FromUtf16(const std::wstring& str)
 			nullptr,
 			nullptr);
 
-		if (convertResult == 0)
-		{
-			DWORD lastError = GetLastError();
-			ThrowExceptionForWin32Error("WideCharToMultiByte", lastError);
-		}
+		THROW_LAST_ERROR_IF(convertResult == 0);
 	}
 
 	return result;
@@ -103,11 +78,7 @@ std::wstring GZStringConvert::ToUtf16(const cIGZString& str)
 			nullptr,
 			0);
 
-		if (utf16Length == 0)
-		{
-			DWORD lastError = GetLastError();
-			ThrowExceptionForWin32Error("MultiByteToWideChar", lastError);
-		}
+		THROW_LAST_ERROR_IF(utf16Length == 0);
 
 		result.resize(static_cast<size_t>(utf16Length), L'\0');
 
@@ -119,11 +90,7 @@ std::wstring GZStringConvert::ToUtf16(const cIGZString& str)
 			result.data(),
 			utf16Length);
 
-		if (convertResult == 0)
-		{
-			DWORD lastError = GetLastError();
-			ThrowExceptionForWin32Error("MultiByteToWideChar", lastError);
-		}
+		THROW_LAST_ERROR_IF(convertResult == 0);
 	}
 
 	return result;
