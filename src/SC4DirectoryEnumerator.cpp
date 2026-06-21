@@ -101,10 +101,18 @@ namespace
 		return directory;
 	}
 
+	// Attributes set on cloud files (OneDrive, etc.) that are not yet downloaded
+	// and on legacy offline files. Opening such files will trigger a remote read or
+	// download, stalling the loading loop for each affected file.
+	constexpr DWORD kUnavailableFileAttributes =
+		FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS | // cloud placeholder, data must be fetched
+		FILE_ATTRIBUTE_OFFLINE;                // older offline-storage marker
+
 	void NativeScanDirectoryRecursive(
 		const std::wstring& directory,
 		bool normalizeExtendedPath,
 		std::vector<cRZBaseString>& files,
+		uint32_t& unavailableFileCount,
 		FileNamePredicate Predicate)
 	{
 		std::vector<std::wstring> subFolders;
@@ -139,6 +147,10 @@ namespace
 
 					if (Predicate(fileName))
 					{
+						if (findData.dwFileAttributes & kUnavailableFileAttributes)
+						{
+							++unavailableFileCount;
+						}
 						files.push_back(CreateUtf8FilePath(directory, fileName));
 					}
 				}
@@ -164,25 +176,31 @@ namespace
 		// Recursively search the sub-directories.
 		for (const auto& path : subFolders)
 		{
-			NativeScanDirectoryRecursive(path, false, files, Predicate);
+			NativeScanDirectoryRecursive(path, false, files, unavailableFileCount, Predicate);
 		}
 	}
 }
 
-std::vector<cRZBaseString> SC4DirectoryEnumerator::GetDatFilesRecurseSubdirectories(const cIGZString& root)
+DBPFScanResult SC4DirectoryEnumerator::GetDatFilesRecurseSubdirectories(const cIGZString& root)
 {
-	std::vector<cRZBaseString> files;
+	DBPFScanResult result;
 
-	NativeScanDirectoryRecursive(GZStringConvert::ToUtf16(root), true, files, DatFilesPredicate);
+	NativeScanDirectoryRecursive(
+		GZStringConvert::ToUtf16(root), true,
+		result.files, result.unavailableFileCount,
+		DatFilesPredicate);
 
-	return files;
+	return result;
 }
 
-std::vector<cRZBaseString> SC4DirectoryEnumerator::GetLooseSC4FilesRecurseSubdirectories(const cIGZString& root)
+DBPFScanResult SC4DirectoryEnumerator::GetLooseSC4FilesRecurseSubdirectories(const cIGZString& root)
 {
-	std::vector<cRZBaseString> files;
+	DBPFScanResult result;
 
-	NativeScanDirectoryRecursive(GZStringConvert::ToUtf16(root), true, files, SC4FilesPredicate);
+	NativeScanDirectoryRecursive(
+		GZStringConvert::ToUtf16(root), true,
+		result.files, result.unavailableFileCount,
+		SC4FilesPredicate);
 
-	return files;
+	return result;
 }

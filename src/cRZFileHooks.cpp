@@ -232,13 +232,18 @@ namespace
 						break;
 					}
 
+					// FILE_FLAG_RANDOM_ACCESS tells the cache manager not to prefetch
+					// sequentially, which matches SC4's access pattern: after the initial
+					// header/index read the game seeks to arbitrary record offsets within
+					// each DBPF file. The prefetch stage (PrefetchFiles) uses its own
+					// handles with FILE_FLAG_SEQUENTIAL_SCAN for the header warm-up.
 					HANDLE hFile = CreateFileW(
 						utf16Path.c_str(),
 						dwDesiredAccess,
 						dwShareMode,
 						nullptr,
 						dwCreationDisposition,
-						0,
+						FILE_FLAG_RANDOM_ACCESS,
 						nullptr);
 
 					if (hFile == INVALID_HANDLE_VALUE)

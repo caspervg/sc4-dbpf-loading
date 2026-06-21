@@ -11,6 +11,8 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "BaseMultiPackedFile.h"
+#include "GZStringConvert.h"
+#include "PathUtil.h"
 #include "PersistResourceKeyList.h"
 #include "Logger.h"
 #include "SC4DirectoryEnumerator.h"
@@ -26,6 +28,112 @@
 #include "cRZCOMDllDirector.h"
 #include "GZServPtrs.h"
 #include "wil/resource.h"
+#include <atomic>
+#include <thread>
+#include <Windows.h>
+
+namespace
+{
+	// Reads the first 64 KB of each file into the OS page cache from a thread pool,
+	// overlapping the network/cloud downloads before the main thread's sequential
+	// COM-based Open() loop begins. On a local SSD the benefit is minor; on OneDrive
+	// or a network share it can trigger N parallel downloads instead of N serial ones.
+	//
+	// The sequential COM loading loop is unchanged — this only warms the cache.
+	void PrefetchFiles(const std::vector<cRZBaseString>& files)
+	{
+		if (files.size() < 2)
+		{
+			return;
+		}
+
+		// Cap at 8 workers to avoid overwhelming a slow network link and to stay
+		// well within the 32-bit process's address space budget for thread stacks.
+		const size_t hwThreads = static_cast<size_t>(std::thread::hardware_concurrency());
+		const size_t workerCount = std::min(
+			hwThreads > 1 ? hwThreads - 1 : 1,
+			std::min(files.size(), static_cast<size_t>(8)));
+
+		std::atomic<size_t> nextIndex{ 0 };
+
+		auto worker = [&]()
+		{
+			constexpr DWORD kPrefetchBytes = 64u * 1024u;
+			// Stack-allocate the read buffer — 64 KB is within the default 1 MB stack.
+			uint8_t buffer[kPrefetchBytes];
+
+			while (true)
+			{
+				const size_t idx = nextIndex.fetch_add(1, std::memory_order_relaxed);
+				if (idx >= files.size())
+				{
+					break;
+				}
+
+				const cRZBaseString& utf8Path = files[idx];
+				std::wstring wpath = GZStringConvert::ToUtf16(utf8Path);
+
+				if (PathUtil::MustAddExtendedPathPrefix(wpath))
+				{
+					wpath = PathUtil::Normalize(PathUtil::AddExtendedPathPrefix(wpath));
+				}
+
+				// FILE_FLAG_SEQUENTIAL_SCAN tells the cache manager to prefetch
+				// ahead aggressively; we only need the header region anyway.
+				HANDLE hFile = CreateFileW(
+					wpath.c_str(),
+					GENERIC_READ,
+					FILE_SHARE_READ,
+					nullptr,
+					OPEN_EXISTING,
+					FILE_FLAG_SEQUENTIAL_SCAN,
+					nullptr);
+
+				if (hFile != INVALID_HANDLE_VALUE)
+				{
+					DWORD bytesRead = 0;
+					ReadFile(hFile, buffer, kPrefetchBytes, &bytesRead, nullptr);
+					CloseHandle(hFile);
+				}
+			}
+		};
+
+		std::vector<std::thread> workers;
+		workers.reserve(workerCount);
+		for (size_t i = 0; i < workerCount; ++i)
+		{
+			workers.emplace_back(worker);
+		}
+		for (std::thread& t : workers)
+		{
+			t.join();
+		}
+	}
+
+	// Logs a one-time warning when the plugins folder lives on a network or
+	// remote drive (DRIVE_REMOTE), which includes UNC shares and mapped drives.
+	// OneDrive folders stored under the local profile are reported as DRIVE_FIXED
+	// by Windows even though individual files may still be cloud-only; those are
+	// caught separately via the unavailableFileCount from the directory scan.
+	void LogRemoteDriveWarning(const cIGZString& folderPath)
+	{
+		std::wstring wpath = GZStringConvert::ToUtf16(folderPath);
+
+		wchar_t volumePath[MAX_PATH + 1]{};
+		if (GetVolumePathNameW(wpath.c_str(), volumePath, ARRAYSIZE(volumePath)))
+		{
+			if (GetDriveTypeW(volumePath) == DRIVE_REMOTE)
+			{
+				Logger::GetInstance().WriteLineFormatted(
+					LogLevel::Info,
+					"The plugin folder '%s' is on a network/remote drive. "
+					"Each file open is a round-trip; loading may be significantly slower "
+					"than from a local drive.",
+					folderPath.ToChar());
+			}
+		}
+	}
+}
 
 BaseMultiPackedFile::BaseMultiPackedFile(bool enumerateSegmentsLastInFirstOut)
 	: segmentID(0),
@@ -101,11 +209,39 @@ bool BaseMultiPackedFile::Open(bool openRead, bool openWrite)
 	{
 		try
 		{
-			std::vector<cRZBaseString> files = GetDBPFFiles(folderPath);
+			// OPT-4: warn early if the folder is on a network/remote drive so the
+			// user knows why startup is slow before the file-open loop begins.
+			LogRemoteDriveWarning(folderPath);
+
+			DBPFScanResult scanResult = GetDBPFFiles(folderPath);
+			const std::vector<cRZBaseString>& files = scanResult.files;
+
+			// OPT-4: warn about cloud-placeholder or offline files that will each
+			// stall the loading loop while their data is fetched from the cloud.
+			if (scanResult.unavailableFileCount > 0)
+			{
+				Logger::GetInstance().WriteLineFormatted(
+					LogLevel::Info,
+					"%u plugin file(s) in '%s' are not locally available (cloud-only or offline). "
+					"Each will trigger a download during loading. To avoid this delay, "
+					"configure the folder to 'Always keep on this device' in OneDrive.",
+					scanResult.unavailableFileCount,
+					folderPath.ToChar());
+			}
 
 			if (!files.empty())
 			{
 				segments.reserve(files.size());
+
+				// OPT-5: pre-size the TGI map to avoid repeated rehashing as entries
+				// are inserted. 64 is a conservative average TGI-entries-per-file;
+				// over-reserving wastes a little memory, under-reserving causes rehashes.
+				tgiMap.reserve(files.size() * 64);
+
+				// OPT-1: warm the OS page cache (and trigger parallel cloud downloads)
+				// before the sequential COM-based Open() loop below. The loop order and
+				// semantics are completely unchanged — this only pre-populates the cache.
+				PrefetchFiles(files);
 
 				cIGZCOM* pCOM = RZGetFramework()->GetCOMObject();
 				cRZAutoRefCount<PersistResourceKeyList> keyList(

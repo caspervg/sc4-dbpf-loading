@@ -11,6 +11,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include "DBPFScanResult.h"
 #include "cIGZPersistDBSegment.h"
 #include "cIGZPersistDBSegmentMultiPackedFiles.h"
 #include "cRZBaseString.h"
@@ -99,7 +100,7 @@ public:
 	void RemovedResource(cGZPersistResourceKey const&, cIGZPersistDBSegment*) override;
 
 protected:
-	virtual std::vector<cRZBaseString> GetDBPFFiles(const cIGZString& folderPath) const = 0;
+	virtual DBPFScanResult GetDBPFFiles(const cIGZString& folderPath) const = 0;
 
 private:
 	bool SetupGZPersistDBSegment(

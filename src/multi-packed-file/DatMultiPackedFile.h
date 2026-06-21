@@ -21,5 +21,5 @@ public:
 	DatMultiPackedFile();
 
 protected:
-	std::vector<cRZBaseString> GetDBPFFiles(const cIGZString& path) const override;
+	DBPFScanResult GetDBPFFiles(const cIGZString& path) const override;
 };

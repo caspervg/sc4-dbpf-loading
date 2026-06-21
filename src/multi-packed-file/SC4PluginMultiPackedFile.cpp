@@ -17,7 +17,7 @@ SC4PluginMultiPackedFile::SC4PluginMultiPackedFile() : BaseMultiPackedFile(true)
 {
 }
 
-std::vector<cRZBaseString> SC4PluginMultiPackedFile::GetDBPFFiles(const cIGZString& folderPath) const
+DBPFScanResult SC4PluginMultiPackedFile::GetDBPFFiles(const cIGZString& folderPath) const
 {
 	return SC4DirectoryEnumerator::GetLooseSC4FilesRecurseSubdirectories(folderPath);
 }

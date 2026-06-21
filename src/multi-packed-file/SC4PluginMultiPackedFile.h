@@ -24,5 +24,5 @@ public:
 	SC4PluginMultiPackedFile();
 
 protected:
-	std::vector<cRZBaseString> GetDBPFFiles(const cIGZString& folderPath) const override;
+	DBPFScanResult GetDBPFFiles(const cIGZString& folderPath) const override;
 };

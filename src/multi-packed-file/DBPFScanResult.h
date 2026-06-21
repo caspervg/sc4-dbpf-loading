@@ -11,12 +11,17 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "DBPFScanResult.h"
 #include "cRZBaseString.h"
+#include <cstdint>
 #include <vector>
 
-namespace SC4DirectoryEnumerator
+struct DBPFScanResult
 {
-	DBPFScanResult GetDatFilesRecurseSubdirectories(const cIGZString& root);
-	DBPFScanResult GetLooseSC4FilesRecurseSubdirectories(const cIGZString& root);
+	std::vector<cRZBaseString> files;
+
+	// The number of files whose data is not immediately available locally.
+	// These are cloud-placeholder or offline files that will trigger a network
+	// download (or remote read) when SC4 opens them during the loading loop.
+	// A non-zero value means startup will be delayed by download time.
+	uint32_t unavailableFileCount = 0;
 };
