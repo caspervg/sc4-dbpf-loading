@@ -32,8 +32,10 @@
     <ClCompile Include="Patcher.cpp" />
     <ClCompile Include="PathUtil.cpp" />
     <ClCompile Include="PersistResourceKeyList.cpp" />
-    <ClCompile Include="QFSDecoder.cpp">
+    <ClCompile Include="QFSDecoder.cpp" />
+    <ClCompile Include="QFSDecoderAVX2.cpp">
       <AdditionalOptions>/arch:AVX2 %(AdditionalOptions)</AdditionalOptions>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
     </ClCompile>
     <ClCompile Include="QFSDecoderHooks.cpp" />
     <ClCompile Include="SC4DirectoryEnumerator.cpp" />
@@ -149,7 +151,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <OmitFramePointers>true</OmitFramePointers>
-      <AdditionalOptions>/Ob3 /Oi /Ot /GL /Gw %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/Ob3 /Oi /Ot /Gw %(AdditionalOptions)</AdditionalOptions>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;SC4BUDGETDEPARTMENTTESTING_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>

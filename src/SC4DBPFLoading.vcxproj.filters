@@ -96,6 +96,15 @@
     <ClCompile Include="PathUtil.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="QFSDecoder.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="QFSDecoderAVX2.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="QFSDecoderHooks.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="multi-packed-file\BaseMultiPackedFile.cpp">
       <Filter>Source Files\multi-packed-file</Filter>
     </ClCompile>
@@ -171,6 +180,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Patcher.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="QFSDecoder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="QFSDecoderHooks.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="LooseSC4PluginScanPatch.h">

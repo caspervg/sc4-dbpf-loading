@@ -19,22 +19,6 @@ namespace
 		uint8_t* output);
 
 	static DecodeRef RealDecodeRef = reinterpret_cast<DecodeRef>(DecodeRefAddress);
-
-	uint32_t __cdecl HookedDecodeRef(
-		const uint8_t* input,
-		int* consumed,
-		uint8_t* output)
-	{
-		// The decoder is called only for RefPack records by the normal DBPF path.
-		// Retain the original function as a safety fallback for malformed or
-		// unexpected calls while the hook is being validated.
-		if (!input || !output)
-		{
-			return RealDecodeRef(input, consumed, output);
-		}
-
-		return QFSDecoder::Decode(input, consumed, const_cast<uint8_t*>(output));
-	}
 }
 
 void QFSDecoderHooks::Install()
@@ -55,14 +39,19 @@ void QFSDecoderHooks::Install()
 		DetourRestoreAfterWith();
 		DetourTransactionBegin();
 		DetourUpdateThread(GetCurrentThread());
+		const DecodeRef decoder = QFSDecoder::GetDecoder();
 		DetourAttach(
 			reinterpret_cast<PVOID*>(&RealDecodeRef),
-			reinterpret_cast<PVOID>(HookedDecodeRef));
+			reinterpret_cast<PVOID>(decoder));
 
 		const LONG error = DetourTransactionCommit();
 		if (error == NO_ERROR)
 		{
-			logger.WriteLine(LogLevel::Info, "Installed the SIMD QFS decoder hook.");
+			logger.WriteLine(
+				LogLevel::Info,
+				QFSDecoder::UsesAVX2()
+					? "Installed the hybrid AVX2 QFS decoder hook."
+					: "Installed the scalar QFS decoder hook.");
 		}
 		else
 		{

@@ -12,5 +12,7 @@ namespace QFSDecoder
 		int* consumed,
 		uint8_t* output);
 
+	DecodeRefFunction GetDecoder() noexcept;
+	bool UsesAVX2() noexcept;
 	uint32_t Decode(const uint8_t* input, int* consumed, uint8_t* output) noexcept;
 }
