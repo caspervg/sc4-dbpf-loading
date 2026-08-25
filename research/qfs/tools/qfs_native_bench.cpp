@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <fstream>
+#include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <map>
@@ -297,7 +298,9 @@ static bool is_qfs(const std::vector<uint8_t>& payload) {
 }
 
 static uint32_t decode_dispatch(const uint8_t* input, int* consumed, uint8_t* output) {
-#ifdef QFS_SIMD
+#if defined(QFS_HYBRID)
+    return decode_ref_hybrid(input, consumed, output);
+#elif defined(QFS_SIMD)
     return decode_ref_simd(input, consumed, output);
 #else
     return decode_ref(input, consumed, output);
@@ -327,7 +330,7 @@ static const char* type_name(uint32_t type) {
 #ifndef QFS_BENCH_NO_MAIN
 int wmain(int argc, wchar_t** argv) {
     if (argc < 2) {
-        std::wcerr << L"usage: qfs_native_bench.exe file.dat [file2.dat ...]\n";
+        std::wcerr << L"usage: qfs_native_bench.exe file.dat [file2.dat ...] or directory\n";
         return 2;
     }
     LARGE_INTEGER frequency{};
@@ -336,8 +339,27 @@ int wmain(int argc, wchar_t** argv) {
     size_t files = 0, qfs_entries = 0, errors = 0;
     volatile uint8_t checksum = 0;
 
+    std::vector<std::wstring> input_files;
     for (int arg = 1; arg < argc; ++arg) {
-        const auto file = read_file(argv[arg]);
+        const std::filesystem::path input(argv[arg]);
+        std::error_code error;
+        if (std::filesystem::is_regular_file(input, error)) {
+            input_files.push_back(input.wstring());
+        } else if (std::filesystem::is_directory(input, error)) {
+            for (std::filesystem::recursive_directory_iterator it(
+                     input, std::filesystem::directory_options::skip_permission_denied, error), end;
+                 it != end; it.increment(error)) {
+                if (error) { error.clear(); continue; }
+                if (it->is_regular_file(error) &&
+                    _wcsicmp(it->path().extension().c_str(), L".dat") == 0)
+                    input_files.push_back(it->path().wstring());
+            }
+        }
+    }
+    std::sort(input_files.begin(), input_files.end());
+
+    for (const auto& input_file : input_files) {
+        const auto file = read_file(input_file);
         if (file.size() < 0x60 || std::string(reinterpret_cast<const char*>(file.data()), 4) != "DBPF")
             continue;
         ++files;
@@ -374,7 +396,7 @@ int wmain(int argc, wchar_t** argv) {
                                double(frequency.QuadPart)) / repeats;
             results[type_name(type)].push_back({type, size, expected, us});
         }
-        std::wcerr << L"processed " << argv[arg]
+        std::wcerr << L"processed " << input_file
                    << L" (QFS entries cumulative: " << qfs_entries << L")\n";
     }
 
