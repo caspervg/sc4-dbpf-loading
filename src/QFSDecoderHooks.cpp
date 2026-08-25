@@ -28,7 +28,8 @@ void QFSDecoderHooks::Install()
 	try
 	{
 		const uint8_t* target = reinterpret_cast<const uint8_t*>(DecodeRefAddress);
-		static constexpr uint8_t expectedPrologue[] = { 0x55, 0x8B, 0xEC, 0x83, 0xEC, 0x08 };
+		static constexpr uint8_t expectedPrologue[] = {
+			0x55, 0x8B, 0xEC, 0x51, 0x51, 0x8B};
 
 		if (std::memcmp(target, expectedPrologue, sizeof(expectedPrologue)) != 0)
 		{
