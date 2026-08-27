@@ -22,12 +22,12 @@
 #include "cIGZPersistResourceKeyList.h"
 #include "cRZBaseUnknown.h"
 #include "PersistResourceKeyHash.h"
-#include <vector>
+#include <deque>
 
 class PersistResourceKeyList final : public cRZBaseUnknown, public cIGZPersistResourceKeyList
 {
 public:
-	using container = std::vector<cGZPersistResourceKey>;
+	using container = std::deque<cGZPersistResourceKey>;
 
 	PersistResourceKeyList();
 
