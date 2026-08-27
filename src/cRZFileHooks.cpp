@@ -42,7 +42,7 @@ namespace
 
 		while (remaining > 0)
 		{
-			const DWORD numberOfBytesToRead = std::min(0x80000000UL, static_cast<DWORD>(remaining));
+			const DWORD numberOfBytesToRead = (std::min)(0x80000000UL, static_cast<DWORD>(remaining));
 			DWORD numberOfBytesRead = 0;
 
 			if (!ReadFile(hFile, buffer + bytesRead, numberOfBytesToRead, &numberOfBytesRead, nullptr))
