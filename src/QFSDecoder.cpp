@@ -119,19 +119,20 @@ namespace
 		return outputSize;
 	}
 
-	bool HasAVX2() noexcept
+	bool SupportsAVX2Decoder() noexcept
 	{
 		int cpuInfo[4] = {};
 		__cpuidex(cpuInfo, 0, 0);
 		if (cpuInfo[0] < 7) return false;
 
+		// /arch:AVX2 permits MSVC to use the Haswell-era instruction set,
+		// including instructions not explicitly present in the source.
 		__cpuidex(cpuInfo, 1, 0);
-		// MSVC may emit FMA instructions for translation units compiled with
-		// /arch:AVX2, so include FMA in the required feature set.
 		constexpr int FMA = 1 << 12;
+		constexpr int MOVBE = 1 << 22;
 		constexpr int OSXSAVE = 1 << 27;
 		constexpr int AVX = 1 << 28;
-		constexpr int RequiredLeaf1Features = FMA | OSXSAVE | AVX;
+		constexpr int RequiredLeaf1Features = FMA | MOVBE | OSXSAVE | AVX;
 		if ((cpuInfo[2] & RequiredLeaf1Features) != RequiredLeaf1Features) return false;
 
 		// XCR0 bits 1 and 2 show that the OS preserves XMM and YMM state.
@@ -139,8 +140,18 @@ namespace
 		if ((_xgetbv(0) & XMMAndYMMState) != XMMAndYMMState) return false;
 
 		__cpuidex(cpuInfo, 7, 0);
+		constexpr int BMI1 = 1 << 3;
 		constexpr int AVX2 = 1 << 5;
-		return (cpuInfo[1] & AVX2) != 0;
+		constexpr int BMI2 = 1 << 8;
+		constexpr int RequiredLeaf7Features = BMI1 | AVX2 | BMI2;
+		if ((cpuInfo[1] & RequiredLeaf7Features) != RequiredLeaf7Features) return false;
+
+		constexpr uint32_t ExtendedFeatureLeaf = 0x80000001u;
+		__cpuidex(cpuInfo, static_cast<int>(0x80000000u), 0);
+		if (static_cast<uint32_t>(cpuInfo[0]) < ExtendedFeatureLeaf) return false;
+		__cpuidex(cpuInfo, static_cast<int>(ExtendedFeatureLeaf), 0);
+		constexpr int LZCNT = 1 << 5;
+		return (cpuInfo[2] & LZCNT) != 0;
 	}
 
 	struct DecoderDispatch
@@ -151,7 +162,7 @@ namespace
 
 	const DecoderDispatch& GetDispatch() noexcept
 	{
-		static const DecoderDispatch dispatch = HasAVX2()
+		static const DecoderDispatch dispatch = SupportsAVX2Decoder()
 			? DecoderDispatch{QFSDecoder::Detail::DecodeAVX2, true}
 			: DecoderDispatch{DecodeScalar, false};
 		return dispatch;

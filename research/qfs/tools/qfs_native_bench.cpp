@@ -250,6 +250,13 @@ static uint32_t le32(const uint8_t* p) {
            (uint32_t(p[3]) << 24);
 }
 
+static constexpr bool range_within(size_t offset, size_t length, size_t total) {
+    return offset <= total && length <= total - offset;
+}
+
+static_assert(range_within(4, 3, 7));
+static_assert(!range_within(size_t(-2), 4, size_t(-1)));
+
 // Equivalent to cRZFastCompression3::decoderef(char*, long*, char*).
 static uint32_t decode_ref(const uint8_t* input, int* consumed, uint8_t* output) {
     if (!input) {
@@ -387,14 +394,16 @@ int wmain(int argc, wchar_t** argv) {
         const uint32_t count = le32(file.data() + 0x24);
         const uint32_t index_offset = le32(file.data() + 0x28);
         const uint32_t index_size = le32(file.data() + 0x2c);
-        if (!count || index_size < count * 20u || index_offset + index_size > file.size()) continue;
+        if (!count || count > index_size / 20u ||
+            !range_within(index_offset, index_size, file.size())) continue;
         const uint32_t stride = index_size / count;
         for (uint32_t i = 0; i < count; ++i) {
-            const uint8_t* record = file.data() + index_offset + i * stride;
+            const size_t record_offset = size_t(index_offset) + size_t(i) * stride;
+            const uint8_t* record = file.data() + record_offset;
             const uint32_t type = le32(record);
             const uint32_t offset = le32(record + 12);
             const uint32_t size = le32(record + 16);
-            if (offset > file.size() || size > file.size() - offset) continue;
+            if (!range_within(offset, size, file.size())) continue;
             std::vector<uint8_t> payload(file.begin() + offset, file.begin() + offset + size);
             if (!is_qfs(payload)) continue;
             ++qfs_entries;

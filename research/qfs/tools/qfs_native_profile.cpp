@@ -113,9 +113,9 @@ bool profile_stream(const uint8_t* input, const uint8_t* end, StreamProfile& res
             ? size_t(std::max(ptrdiff_t(0), position - begin)) : 0;
         return false;
     };
-    if (!input || input + 5 > end) return fail("truncated QFS header");
+    if (!input || input > end || size_t(end - input) < 5) return fail("truncated QFS header");
     const uint8_t* source = input + ((*input & 1) ? 5 : 2);
-    if (source + 3 > end) return fail_at("truncated output-size field", source);
+    if (size_t(end - source) < 3) return fail_at("truncated output-size field", source);
     const size_t expected = (size_t(source[0]) << 16) | (size_t(source[1]) << 8) | source[2];
     source += 3;
     size_t produced = 0;
@@ -134,14 +134,14 @@ bool profile_stream(const uint8_t* input, const uint8_t* end, StreamProfile& res
             distance = size_t(b2) + (code & 0x60) * 8 + 1;
             command_class = 0;
         } else if (!(code & 0x40)) {
-            if (source + 2 > end) return fail_at("truncated medium control", source);
+            if (size_t(end - source) < 2) return fail_at("truncated medium control", source);
             const uint8_t b2 = *source++, b3 = *source++;
             literals = b2 >> 6;
             length = (code & 0x3f) + 4;
             distance = (size_t(b2 & 0x3f) << 8) + b3 + 1;
             command_class = 1;
         } else if (!(code & 0x20)) {
-            if (source + 3 > end) return fail_at("truncated long control", source);
+            if (size_t(end - source) < 3) return fail_at("truncated long control", source);
             const uint8_t b2 = *source++, b3 = *source++, b4 = *source++;
             literals = code & 3;
             length = ((code & 0x0c) << 6) + b4 + 5;
@@ -152,7 +152,10 @@ bool profile_stream(const uint8_t* input, const uint8_t* end, StreamProfile& res
             command_class = 3;
             if (literals > 0x70) {
                 literals = code & 3;
-                if (source + literals > end) return fail_at("truncated terminator literals", source);
+                if (literals > size_t(end - source))
+                    return fail_at("truncated terminator literals", source);
+                if (literals > expected - produced)
+                    return fail_at("output exceeds QFS header", source);
                 result.literal_bytes += literals;
                 result.literal_lengths[literal_bucket(literals)]++;
                 produced += literals;
@@ -161,8 +164,8 @@ bool profile_stream(const uint8_t* input, const uint8_t* end, StreamProfile& res
             }
         }
 
-        if (source + literals > end) return fail_at("truncated command literals", source);
-        if (distance > produced + literals) return fail_at("match distance precedes output", source);
+        if (literals > size_t(end - source)) return fail_at("truncated command literals", source);
+        if (literals > expected - produced) return fail_at("output exceeds QFS header", source);
         result.commands++;
         result.command_classes[command_class]++;
         result.literal_bytes += literals;
@@ -171,6 +174,8 @@ bool profile_stream(const uint8_t* input, const uint8_t* end, StreamProfile& res
         source += literals;
 
         if (length) {
+            if (distance > produced) return fail_at("match distance precedes output", source);
+            if (length > expected - produced) return fail_at("output exceeds QFS header", source);
             result.match_bytes += length;
             result.match_lengths[length_bucket(length)]++;
             result.match_distances[distance_bucket(distance)]++;
@@ -310,15 +315,17 @@ int wmain(int argc, wchar_t** argv) {
         const uint32_t count = le32(file.data() + 0x24);
         const uint32_t index_offset = le32(file.data() + 0x28);
         const uint32_t index_size = le32(file.data() + 0x2c);
-        if (!count || index_size < count * 20u || index_offset + index_size > file.size()) continue;
+        if (!count || count > index_size / 20u ||
+            !range_within(index_offset, index_size, file.size())) continue;
         const uint32_t stride = index_size / count;
 
         for (uint32_t i = 0; i < count; ++i) {
-            const uint8_t* record = file.data() + index_offset + i * stride;
+            const size_t record_offset = size_t(index_offset) + size_t(i) * stride;
+            const uint8_t* record = file.data() + record_offset;
             if (le32(record) != FshType) continue;
             const uint32_t group = le32(record + 4), instance = le32(record + 8);
             const uint32_t offset = le32(record + 12), size = le32(record + 16);
-            if (offset > file.size() || size > file.size() - offset) continue;
+            if (!range_within(offset, size, file.size())) continue;
             const uint8_t* payload = file.data() + offset;
             if (size < 9 || (payload[4] != 0x10 && payload[4] != 0x50) || payload[5] != 0xfb) continue;
             ++fsh_seen;
@@ -446,6 +453,7 @@ int wmain(int argc, wchar_t** argv) {
             const bool in_99 = sample.simd_us >= latency_p99;
             const bool inefficient = double(sample.simd_us) / sample.uncompressed >= efficiency_p99;
             if (!in_90_99 && !in_99 && !inefficient) continue;
+            if (!range_within(sample.offset, sample.compressed, file.size())) continue;
             StreamProfile profile;
             const uint8_t* payload = file.data() + sample.offset;
             if (!profile_stream(payload + 4, payload + sample.compressed, profile)) continue;
