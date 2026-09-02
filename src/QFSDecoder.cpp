@@ -1,4 +1,24 @@
 /*
+ * This file is part of sc4-dbpf-loading, a DLL Plugin for SimCity 4 that
+ * optimizes the DBPF loading.
+ *
+ * Copyright (C) 2026 Casper Van Gheluwe
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation, under
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, see <https://www.gnu.org/licenses/>.
+ */
+
+/*
  * Baseline QFS/RefPack decoder and modern-CPU dispatch.
  *
  * Keep this translation unit free of AVX instructions. The AVX2 decoder is
@@ -106,19 +126,27 @@ namespace
 		if (cpuInfo[0] < 7) return false;
 
 		__cpuidex(cpuInfo, 1, 0);
+		// MSVC may emit FMA instructions for translation units compiled with
+		// /arch:AVX2, so include FMA in the required feature set.
+		constexpr int FMA = 1 << 12;
 		constexpr int OSXSAVE = 1 << 27;
 		constexpr int AVX = 1 << 28;
-		if ((cpuInfo[2] & (OSXSAVE | AVX)) != (OSXSAVE | AVX)) return false;
-		if ((_xgetbv(0) & 0x6) != 0x6) return false;
+		constexpr int RequiredLeaf1Features = FMA | OSXSAVE | AVX;
+		if ((cpuInfo[2] & RequiredLeaf1Features) != RequiredLeaf1Features) return false;
+
+		// XCR0 bits 1 and 2 show that the OS preserves XMM and YMM state.
+		constexpr uint64_t XMMAndYMMState = (1ULL << 1) | (1ULL << 2);
+		if ((_xgetbv(0) & XMMAndYMMState) != XMMAndYMMState) return false;
 
 		__cpuidex(cpuInfo, 7, 0);
-		return (cpuInfo[1] & (1 << 5)) != 0;
+		constexpr int AVX2 = 1 << 5;
+		return (cpuInfo[1] & AVX2) != 0;
 	}
 
 	struct DecoderDispatch
 	{
-		DecodeRefFunction function;
-		bool usesAVX2;
+		DecodeRefFunction function = nullptr;
+		bool usesAVX2 = false;
 	};
 
 	const DecoderDispatch& GetDispatch() noexcept

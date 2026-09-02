@@ -1,3 +1,23 @@
+/*
+ * This file is part of sc4-dbpf-loading, a DLL Plugin for SimCity 4 that
+ * optimizes the DBPF loading.
+ *
+ * Copyright (C) 2026 Casper Van Gheluwe
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation, under
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, see <https://www.gnu.org/licenses/>.
+ */
+
 // Native-shaped QFS benchmark for SimCity 4.
 //
 // The decode_ref function follows the Mac x86 symbolized binary's
@@ -308,13 +328,14 @@ static uint32_t decode_dispatch(const uint8_t* input, int* consumed, uint8_t* ou
 }
 
 static std::vector<uint8_t> read_file(const std::wstring& path) {
-    std::ifstream f(path, std::ios::binary);
+    std::ifstream f(std::filesystem::path(path), std::ios::binary);
     if (!f) return {};
     f.seekg(0, std::ios::end);
     const auto size = f.tellg();
+    if (size <= 0) return {};
     f.seekg(0);
     std::vector<uint8_t> data(static_cast<size_t>(size));
-    f.read(reinterpret_cast<char*>(data.data()), size);
+    if (!f.read(reinterpret_cast<char*>(data.data()), size)) return {};
     return data;
 }
 

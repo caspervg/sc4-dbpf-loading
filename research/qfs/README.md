@@ -18,6 +18,18 @@ the corpus itself are intentionally excluded.
   byte, profiles FSH command distributions, reports malformed streams, and
   measures the latency tails that motivated the hybrid copy strategy.
 
+## Corpus results
+
+The decoder implementations were compared across 2,190,096 FSH entries,
+representing 7.96 GB of compressed data and 30.34 GB of uncompressed data
+(a 3.81x compression ratio).
+
+| Decoder | Total FSH decode time | Speedup vs Windows-like | Speedup vs SIMD |
+| --- | ---: | ---: | ---: |
+| Windows-like | 22.34 s | 1.00x | - |
+| SIMD | 17.59 s | 1.27x | 1.00x |
+| Hybrid | 9.84 s | 2.27x | 1.79x |
+
 ## Building the native tools
 
 Use an x86 Visual Studio Developer PowerShell. The DLL and SimCity 4 process
@@ -31,6 +43,9 @@ cl /nologo /std:c++20 /EHsc /Os /Ob0 /Oy- `
 
 cl /nologo /std:c++20 /EHsc /O2 /arch:AVX2 `
   qfs_native_bench_simd.cpp /Fe:qfs_native_bench_simd.exe
+
+cl /nologo /std:c++20 /EHsc /O2 /arch:AVX2 `
+  qfs_native_bench_hybrid.cpp /Fe:qfs_native_bench_hybrid.exe
 
 cl /nologo /std:c++20 /EHsc /O2 /arch:AVX2 `
   qfs_native_profile.cpp /Fe:qfs_native_profile.exe
