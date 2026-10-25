@@ -78,7 +78,7 @@ void QFSDecoderHooks::Install()
 		{
 			logger.WriteLineFormatted(
 				LogLevel::Error,
-				"Failed to install the SIMD QFS decoder hook, error code=%d",
+				"Failed to install the QFS decoder hook, error code=%d",
 				error);
 		}
 	}
@@ -86,7 +86,7 @@ void QFSDecoderHooks::Install()
 	{
 		logger.WriteLineFormatted(
 			LogLevel::Error,
-			"Failed to install the SIMD QFS decoder hook: %s",
+			"Failed to install the QFS decoder hook: %s",
 			e.what());
 	}
 }

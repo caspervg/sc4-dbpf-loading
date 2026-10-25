@@ -343,7 +343,8 @@ public:
 		logFilePath /= PluginLogFileName;
 
 		Logger& logger = Logger::GetInstance();
-		logger.Init(logFilePath, LogLevel::Error);
+		// Keep successful patch installation entries in the runtime log as well as errors.
+		logger.Init(logFilePath, LogLevel::Info);
 		logger.WriteLogFileHeader("SC4DBPFLoading v" PLUGIN_VERSION_STR);
 	}
 
