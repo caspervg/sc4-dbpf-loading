@@ -25,11 +25,12 @@ namespace ModelStreamingPatch
 	// Speeds up the model loading that runs after a zoom or rotation change.
 	//
 	// SC4's cSC4ModelBackgroundLoader thread loads the models for the new view in a spiral around
-	// the view center. It only works a few cells per wake before it sleeps again, and the main
-	// thread applies the loaded cells a few at a time. Every frame that applies cells redraws a
-	// large part of the static view, so one zoom change can cost dozens of slow frames.
+	// the view center, and the main thread swaps the occupants to the new models a backlog at a time.
+	// On modern hardware the load area covers the whole city, the loader waits for the main thread
+	// most of the time, and every frame that applies cells redraws a large part of the static view.
 	//
-	// This patch lets the loader thread work in real-time slices with short pauses, removes its
-	// backlog cap, and has the main thread apply the loaded cells in batches.
+	// This patch limits the load area to the view and a margin around it, keeps the loader thread
+	// working, and spreads both the model swaps and a single redraw of the view over frames within a
+	// fixed per-frame time budget.
 	void Install();
 }

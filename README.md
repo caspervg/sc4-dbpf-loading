@@ -40,9 +40,20 @@ placed next to it, e.g. `SC4DBPFLoading.ini`. All keys are optional.
 [ModelStreaming]
 ; 0 disables the model streaming changes.
 Enabled=1
-; How often the models that finished loading are shown, in milliseconds.
-; Each batch redraws the city view once. 0 shows them every frame, like the game does.
-BatchIntervalMs=250
+; The free memory, in MB, that the game may assume when it sizes the area around the view that it
+; loads after a zoom or rotation change. The game scales that area with the free memory, which makes
+; it cover the whole city on current PCs. 0 uses the actual free memory, like the game does.
+LoadMarginMB=512
+; The time per frame, in milliseconds, spent on loaded models and on redrawing the view.
+; Higher values load faster at a lower frame rate.
+FrameBudgetMs=8
+; How far around the view center the models count as on screen, in half screen widths. The view is
+; redrawn once these are in place; the rest is loaded without redraws.
+VisibleProgress=2.0
+; The longest the redraw waits for the models on screen, in milliseconds.
+VisibleMaxMs=2000
+; The size of the tiles the view is redrawn in, in pixels.
+TileSize=512
 ; How long the model loading thread works before it pauses, in milliseconds.
 WorkerSliceMs=4
 ; How long the model loading thread pauses between slices, in microseconds.
