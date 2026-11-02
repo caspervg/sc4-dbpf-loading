@@ -15,6 +15,7 @@ The plugin can be downloaded from the Releases tab: https://github.com/0xC000005
     * With this change only .SC4Desc, .SC4Lot, .SC4Model, and files without any file extension will be loaded.
     * Files without any file extension are included due to some older plugins having that issue.
 * Changes the 'missing plugin' dialog to display the plugin pack ID in hexadecimal.
+* Reduces the lag after zooming or rotating the view, while the game loads the models for the new view.
     
 ## System Requirements
 
@@ -29,6 +30,26 @@ The plugin may work on Windows 7, but I do not have the ability to test that.
 1. Close SimCity 4.
 2. Copy `SC4DBPFLoading.dll` into the top-level of the Plugins folder in the SimCity 4 installation directory or Documents/SimCity 4 directory.
 3. Start SimCity 4.
+
+## Configuration
+
+The model streaming changes can be adjusted with an INI file that has the same name as the DLL and is
+placed next to it, e.g. `SC4DBPFLoading.ini`. All keys are optional.
+
+```ini
+[ModelStreaming]
+; 0 disables the model streaming changes.
+Enabled=1
+; How often the models that finished loading are shown, in milliseconds.
+; Each batch redraws the city view once. 0 shows them every frame, like the game does.
+BatchIntervalMs=250
+; How long the model loading thread works before it pauses, in milliseconds.
+WorkerSliceMs=4
+; How long the model loading thread pauses between slices, in microseconds.
+WorkerRestUs=500
+; Writes a line to the log file for every zoom or rotation load.
+LogStats=1
+```
 
 ## Troubleshooting
 

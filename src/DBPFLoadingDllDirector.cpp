@@ -25,6 +25,7 @@
 #include "FileSystem.h"
 #include "Logger.h"
 #include "LooseSC4PluginScanPatch.h"
+#include "ModelStreamingPatch.h"
 #include "DatMultiPackedFile.h"
 #include "Patcher.h"
 #include "QFSDecoderHooks.h"
@@ -284,6 +285,7 @@ namespace
 			DBPFIndexHashPatch::Install();
 			QFSDecoderHooks::Install();
 			LooseSC4PluginScanPatch::Install();
+			ModelStreamingPatch::Install();
 
 			switch (resourceLoadingTraceOption)
 			{

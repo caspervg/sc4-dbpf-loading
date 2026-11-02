@@ -84,6 +84,9 @@
     <ClCompile Include="LooseSC4PluginScanPatch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ModelStreamingPatch.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\vendor\gzcom-dll\gzcom-dll\src\cRZBaseUnknown.cpp">
       <Filter>Source Files\GZCOM</Filter>
     </ClCompile>
@@ -189,6 +192,9 @@
       <Filter>Header Files\qfs-decoder</Filter>
     </ClInclude>
     <ClInclude Include="LooseSC4PluginScanPatch.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ModelStreamingPatch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\vendor\gzcom-dll\gzcom-dll\include\cRZBaseUnknown.h">
