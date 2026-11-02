@@ -70,6 +70,13 @@
 //    and the screen keeps its current picture meanwhile.
 // 4. Redraws the view once, in TileSize tiles from the center outwards, within FrameBudgetMs per frame.
 // 5. Swaps the remaining, off screen cells within FrameBudgetMs per frame without full redraws.
+// 6. Makes cGZPersistResourceManager::GetPrivateResource take the resource manager lock, like every
+//    other GetResource variant does. The loader thread loads through GetResource, which holds that
+//    lock, while the main thread loads textures through GetPrivateResource without it, while drawing.
+//    Both end up in cDBPFFile::OpenRecord, which only holds a per-file lock: the record objects come
+//    from global cRZFastAllocator free lists and share reference counted buffers that are not thread
+//    safe. A record handed out twice crashed the game in OpenRecord (null buffer AddRef at 0x0096DA20).
+//    The game's own loader was idle most of the time, which hid this; a busy loader exposes it.
 
 namespace
 {
@@ -90,6 +97,12 @@ namespace
 	constexpr uintptr_t kRenderDirtyQueueHeadOffset = 0x1D4;
 	constexpr uintptr_t kRenderDirtyQueueFirstFrameOffset = 0x1F8;
 	constexpr uintptr_t kRenderPropertiesOffset = 0x48;
+
+	// cGZPersistResourceManager: the cRZCriticalSection that GetResource locks (vtable: Lock +0x4,
+	// Unlock +0x8), and the GetPrivateResource slot of its cIGZPersistResourceManager vtable.
+	constexpr uintptr_t kResourceManagerLockOffset = 0x80;
+	constexpr uintptr_t ResourceManager_GetPrivateResource_Slot = 0xAD89E0;
+	constexpr uintptr_t GetPrivateResource_Address = 0x972D60;
 
 	// cRZTimer field offsets. The loader's timers use QueryPerformanceCounter ticks.
 	constexpr uintptr_t kTimerStartOffset = 0x8;
@@ -162,6 +175,8 @@ namespace
 	typedef void(__thiscall* pfn_DoFullViewUpdate)(void* pRender, int32_t reason);
 	typedef void(__thiscall* pfn_DoPartialViewUpdate)(void* pRender, const int32_t* pRect, int32_t reason);
 	typedef void(__fastcall* pfn_ProcessDirtyRectangleQueue)(void* pRender);
+	typedef bool(__thiscall* pfn_GetPrivateResource)(void* pResourceManager, const void* pKey, uint32_t riid, void** ppvObj, uint32_t unknown1, void* unknown2);
+	typedef void(__thiscall* pfn_LockMethod)(void* pLock);
 
 	const pfn_ReadTunableValues RealReadTunableValues = reinterpret_cast<pfn_ReadTunableValues>(ReadTunableValues_Address);
 	const pfn_ProcessMessages RealProcessMessages = reinterpret_cast<pfn_ProcessMessages>(ProcessMessages_Address);
@@ -175,6 +190,7 @@ namespace
 	const pfn_DoFullViewUpdate RealDoFullViewUpdate = reinterpret_cast<pfn_DoFullViewUpdate>(DoFullViewUpdate_Address);
 	const pfn_DoPartialViewUpdate RealDoPartialViewUpdate = reinterpret_cast<pfn_DoPartialViewUpdate>(DoPartialViewUpdate_Address);
 	const pfn_ProcessDirtyRectangleQueue RealProcessDirtyRectangleQueue = reinterpret_cast<pfn_ProcessDirtyRectangleQueue>(ProcessDirtyRectangleQueue_Address);
+	const pfn_GetPrivateResource RealGetPrivateResource = reinterpret_cast<pfn_GetPrivateResource>(GetPrivateResource_Address);
 
 	struct Settings
 	{
@@ -534,6 +550,29 @@ namespace
 
 			SleepEx(static_cast<DWORD>((std::min<ULONGLONG>)(end - now, 10)), TRUE);
 		}
+	}
+
+	// Resource manager.
+
+	bool __fastcall HookedGetPrivateResource(
+		void* pResourceManager,
+		void* /*edxUnused*/,
+		const void* pKey,
+		uint32_t riid,
+		void** ppvObj,
+		uint32_t unknown1,
+		void* unknown2)
+	{
+		// The same lock GetResource holds while it loads. It is recursive, so resource factories that
+		// load other resources keep working.
+		void* const pLock = static_cast<uint8_t*>(pResourceManager) + kResourceManagerLockOffset;
+		const pfn_LockMethod* const lockVTable = *static_cast<const pfn_LockMethod* const*>(pLock);
+
+		lockVTable[1](pLock);
+		const bool result = RealGetPrivateResource(pResourceManager, pKey, riid, ppvObj, unknown1, unknown2);
+		lockVTable[2](pLock);
+
+		return result;
 	}
 
 	// Main thread side: swapping the loaded cells.
@@ -1009,8 +1048,20 @@ void ModelStreamingPatch::Install()
 		return;
 	}
 
+	if (*reinterpret_cast<const uintptr_t*>(ResourceManager_GetPrivateResource_Slot) != GetPrivateResource_Address)
+	{
+		logger.WriteLineFormatted(
+			LogLevel::Error,
+			"Failed to install the model streaming patch: unexpected value at 0x%08X (GetPrivateResource).",
+			ResourceManager_GetPrivateResource_Slot);
+		return;
+	}
+
 	try
 	{
+		// First: the busier loader thread is only safe once GetPrivateResource is locked.
+		Patcher::InstallJumpTableHook(ResourceManager_GetPrivateResource_Slot, &HookedGetPrivateResource);
+
 		for (const CallSite& site : callSites)
 		{
 			Patcher::InstallCallHook(site.address, site.hook);
